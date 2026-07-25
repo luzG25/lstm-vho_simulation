@@ -65,7 +65,7 @@ def blocking_probability(Nu):
 
 def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
              dwell=None, threshold=None, velocity_range=(V_MIN, V_MAX),
-             seed=None):
+             seed=None, log_decisions=False):
     """
     Simula `n_iter` usuários (iterações independentes) andando aleatoriamente
     pela sala durante `sim_time` segundos, decidindo handovers verticais
@@ -73,6 +73,8 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
 
     Retorna dict com médias de: NVHO (handovers/iteração), QoE, packet_loss (%)
     """
+    log = [] if log_decisions else None
+
     rng = np.random.default_rng(seed)
     aps, L = room_layout(room)
     n_steps = int(sim_time / DT)
@@ -160,6 +162,20 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
         time_vlc_ok += vlc_ok * DT
         time_outage += vlc_outage * DT
         time_rf += rf_on * DT
+        
+        if log_decisions:
+            for u in range(n_iter):
+                log.append({
+                    "scheme": scheme, "Nu": Nu, "room": room, "step": step,
+                    "t": t_elapsed[u], "user": u,
+                    "x": pos[u, 0], "y": pos[u, 1], "vel": vel[u],
+                    "geo_cov": bool(geo_cov[u]),
+                    "shadow_blocked": bool(shadow_blocked[u]),
+                    "link_available": bool(link_available[u]),
+                    "mode_before": bool(mode_vlc[u]),
+                    "action_switch": bool(switched[u]),
+                    "mode_after": bool(new_mode[u]),
+                })
 
         mode_vlc = new_mode
 
