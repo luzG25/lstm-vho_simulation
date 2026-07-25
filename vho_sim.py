@@ -1,3 +1,5 @@
+#vho_sim.py
+
 """
 Reprodução da simulação de handover vertical location-aware (LA-VHO) em rede
 híbrida VLC/WLAN, comparada com I-VHO e D-VHO (t=0.5s, t=1s), baseada em:
