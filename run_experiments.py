@@ -3,11 +3,19 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from vho_sim import simulate
+from lstm_policy import LSTMHandoverPolicy
 
-SCHEMES = ["I-VHO", "D-VHO(0.5s)", "D-VHO(1s)", "LA-VHO"]
+# carrega o modelo LSTM-VHO treinado (ver train_lstm_handover.py)
+lstm_policy = LSTMHandoverPolicy(
+    model_path="output/lstm_vho_model.pt",
+    scaler_path="output/lstm_vho_scaler.pkl",
+    meta_path="output/lstm_vho_meta.json",
+)
+
+SCHEMES = ["I-VHO", "D-VHO(0.5s)", "D-VHO(1s)", "LA-VHO", "LSTM-VHO"]
 COLORS = {"I-VHO": "#2f6b3a", "D-VHO(0.5s)": "#4aa3e0",
-          "D-VHO(1s)": "#b5482f", "LA-VHO": "#d63bb0"}
-MARK = {"I-VHO": "s", "D-VHO(0.5s)": "D", "D-VHO(1s)": "o", "LA-VHO": "x"}
+          "D-VHO(1s)": "#b5482f", "LA-VHO": "#d63bb0", "LSTM-VHO": "#e0a020"}
+MARK = {"I-VHO": "s", "D-VHO(0.5s)": "D", "D-VHO(1s)": "o", "LA-VHO": "x", "LSTM-VHO": "^"}
 
 def run_scheme(name, Nu, room, **kw):
     if name == "I-VHO":
@@ -18,6 +26,8 @@ def run_scheme(name, Nu, room, **kw):
         return simulate("D-VHO", Nu, room, dwell=1.0, **kw)
     if name == "LA-VHO":
         return simulate("LA-VHO", Nu, room, threshold=6, **kw)
+    if name == "LSTM-VHO":
+        return simulate("LSTM-VHO", Nu, room, lstm_policy=lstm_policy, **kw)
     raise ValueError(name)
 
 
