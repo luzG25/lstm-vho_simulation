@@ -65,15 +65,23 @@ def blocking_probability(Nu):
 
 def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
              dwell=None, threshold=None, velocity_range=(V_MIN, V_MAX),
-             seed=None, log_decisions=False):
+             seed=None, log_decisions=False, verbose=False):
     """
     Simula `n_iter` usuários (iterações independentes) andando aleatoriamente
     pela sala durante `sim_time` segundos, decidindo handovers verticais
     segundo `scheme` in {'I-VHO','D-VHO','LA-VHO'}.
 
+    Se log_decisions=True, o retorno inclui a chave "log": uma lista de
+    dicionários com uma linha por (usuário, passo de tempo), contendo a
+    posição, o estado do link e a decisão de handover tomada naquele
+    instante — útil para montar um dataset de decisões de handover.
+
     Retorna dict com médias de: NVHO (handovers/iteração), QoE, packet_loss (%)
     """
-    log = [] if log_decisions else None
+    if verbose:
+        print(f"[simulate] scheme={scheme} Nu={Nu} room={room} n_iter={n_iter} "
+              f"sim_time={sim_time} dwell={dwell} threshold={threshold} "
+              f"log_decisions={log_decisions}")
 
     rng = np.random.default_rng(seed)
     aps, L = room_layout(room)
@@ -97,6 +105,8 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
     t_elapsed = np.zeros(n_iter)
 
     force_rf = (Nu >= threshold) if (scheme == "LA-VHO" and threshold is not None) else False
+
+    log = [] if log_decisions else None
 
     for step in range(n_steps):
         t_elapsed += DT
@@ -162,13 +172,19 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
         time_vlc_ok += vlc_ok * DT
         time_outage += vlc_outage * DT
         time_rf += rf_on * DT
-        
+
         if log_decisions:
             for u in range(n_iter):
                 log.append({
-                    "scheme": scheme, "Nu": Nu, "room": room, "step": step,
-                    "t": t_elapsed[u], "user": u,
-                    "x": pos[u, 0], "y": pos[u, 1], "vel": vel[u],
+                    "scheme": scheme,
+                    "Nu": Nu,
+                    "room": room,
+                    "step": step,
+                    "t": float(t_elapsed[u]),
+                    "user": u,
+                    "x": float(pos[u, 0]),
+                    "y": float(pos[u, 1]),
+                    "vel": float(vel[u]),
                     "geo_cov": bool(geo_cov[u]),
                     "shadow_blocked": bool(shadow_blocked[u]),
                     "link_available": bool(link_available[u]),
@@ -179,6 +195,10 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
 
         mode_vlc = new_mode
 
+        if verbose and (step + 1) % max(1, n_steps // 5) == 0:
+            print(f"    [simulate] passo {step + 1}/{n_steps} "
+                  f"(t={t_elapsed[0]:.1f}s) — handovers medios ate agora: {handovers.mean():.2f}")
+
     total_time = n_steps * DT
     avg_nvho = handovers.mean()
     packet_loss = 100.0 * (time_outage / total_time)
@@ -186,8 +206,17 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
     qoe = qoe - DELAY_COST * handovers / (total_time / 10.0)  # custo de sinalização
     qoe = np.clip(qoe, 0, 5)
 
-    return {
+    if verbose:
+        print(f"[simulate] concluido: NVHO={avg_nvho:.2f} QoE={qoe.mean():.2f} "
+              f"packet_loss={packet_loss.mean():.2f}%"
+              + (f" | log com {len(log)} linhas" if log_decisions else ""))
+
+    result = {
         "NVHO": avg_nvho,
         "QoE": qoe.mean(),
         "packet_loss": packet_loss.mean(),
     }
+    if log_decisions:
+        result["log"] = log
+
+    return result
