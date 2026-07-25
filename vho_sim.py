@@ -65,11 +65,17 @@ def blocking_probability(Nu):
 
 def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
              dwell=None, threshold=None, velocity_range=(V_MIN, V_MAX),
-             seed=None, log_decisions=False, verbose=False):
+             seed=None, log_decisions=False, verbose=False, lstm_policy=None):
     """
     Simula `n_iter` usuários (iterações independentes) andando aleatoriamente
     pela sala durante `sim_time` segundos, decidindo handovers verticais
-    segundo `scheme` in {'I-VHO','D-VHO','LA-VHO'}.
+    segundo `scheme` in {'I-VHO','D-VHO','LA-VHO','LSTM-VHO'}.
+
+    Para scheme='LSTM-VHO', é obrigatório passar `lstm_policy`, uma instância
+    de lstm_policy.LSTMHandoverPolicy carregando o modelo treinado em
+    train_lstm_handover.py. Enquanto o histórico de cada usuário ainda não
+    preenche a janela exigida pelo modelo (`lstm_policy.window_size` passos),
+    o esquema se comporta como I-VHO (usa link_available diretamente).
 
     Se log_decisions=True, o retorno inclui a chave "log": uma lista de
     dicionários com uma linha por (usuário, passo de tempo), contendo a
@@ -78,14 +84,25 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
 
     Retorna dict com médias de: NVHO (handovers/iteração), QoE, packet_loss (%)
     """
+    print(f"\n>>> Iniciando simulacao: scheme={scheme} | Nu={Nu} | room={room} "
+          f"| n_iter={n_iter} | sim_time={sim_time}s")
+
     if verbose:
         print(f"[simulate] scheme={scheme} Nu={Nu} room={room} n_iter={n_iter} "
               f"sim_time={sim_time} dwell={dwell} threshold={threshold} "
               f"log_decisions={log_decisions}")
 
+    if scheme == "LSTM-VHO" and lstm_policy is None:
+        raise ValueError("scheme='LSTM-VHO' requer o argumento lstm_policy="
+                          "<instância de LSTMHandoverPolicy> (ver lstm_policy.py)")
+
+
     rng = np.random.default_rng(seed)
     aps, L = room_layout(room)
     n_steps = int(sim_time / DT)
+
+    print(f"    sala '{room}' carregada: {len(aps)} APs VLC, lado={L}m, "
+          f"{n_steps} passos de simulacao (DT={DT}s)")
 
     # --- estado vetorizado (um "usuário" por linha) ---
     pos = rng.uniform(0, L, size=(n_iter, 2))
@@ -107,6 +124,17 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
     force_rf = (Nu >= threshold) if (scheme == "LA-VHO" and threshold is not None) else False
 
     log = [] if log_decisions else None
+
+    # buffer deslizante para o esquema LSTM-VHO: (n_iter, window_size, n_features)
+    # ordem das features tem que bater com lstm_policy.feature_cols:
+    # ["x","y","vel","link_available","geo_cov","shadow_blocked","mode_before"]
+    if scheme == "LSTM-VHO":
+        lstm_window = lstm_policy.window_size
+        lstm_nfeat = lstm_policy.n_features
+        feat_buffer = np.zeros((n_iter, lstm_window, lstm_nfeat), dtype=np.float32)
+        print(f"    LSTM-VHO: buffer deslizante inicializado "
+              f"(window_size={lstm_window}, n_features={lstm_nfeat}) — "
+              f"aquecimento tipo I-VHO durante os primeiros {lstm_window} passos")
 
     for step in range(n_steps):
         t_elapsed += DT
@@ -158,6 +186,29 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
                 la_pending_timer = np.where(stable_state, 0.0, la_pending_timer + DT)
                 do_switch = (~stable_state) & (la_pending_timer >= la_dwell)
                 new_mode = np.where(do_switch, link_available, mode_vlc)
+
+        elif scheme == "LSTM-VHO":
+            # monta a feature do passo atual na MESMA ordem usada no treino
+            current_features = np.stack([
+                pos[:, 0], pos[:, 1], vel,
+                link_available.astype(np.float32),
+                geo_cov.astype(np.float32),
+                shadow_blocked.astype(np.float32),
+                mode_vlc.astype(np.float32),   # mode_before
+            ], axis=1)
+
+            feat_buffer = np.roll(feat_buffer, -1, axis=1)
+            feat_buffer[:, -1, :] = current_features
+
+            if step >= lstm_window - 1:
+                if step == lstm_window - 1:
+                    print(f"    LSTM-VHO: aquecimento concluido no passo {step + 1} "
+                          f"— rede neural comeca a decidir a partir de agora")
+                new_mode = lstm_policy.decide(feat_buffer)
+            else:
+                # aquecimento: janela ainda incompleta -> comporta-se como I-VHO
+                new_mode = link_available
+
         else:
             raise ValueError(scheme)
 
@@ -195,9 +246,10 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
 
         mode_vlc = new_mode
 
-        if verbose and (step + 1) % max(1, n_steps // 5) == 0:
-            print(f"    [simulate] passo {step + 1}/{n_steps} "
-                  f"(t={t_elapsed[0]:.1f}s) — handovers medios ate agora: {handovers.mean():.2f}")
+        if (step + 1) % max(1, n_steps // 5) == 0:
+            print(f"    [passo {step + 1}/{n_steps}] "
+                  f"(t={t_elapsed[0]:.1f}s de {sim_time}s) — "
+                  f"handovers medios ate agora: {handovers.mean():.2f}")
 
     total_time = n_steps * DT
     avg_nvho = handovers.mean()
@@ -206,10 +258,9 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
     qoe = qoe - DELAY_COST * handovers / (total_time / 10.0)  # custo de sinalização
     qoe = np.clip(qoe, 0, 5)
 
-    if verbose:
-        print(f"[simulate] concluido: NVHO={avg_nvho:.2f} QoE={qoe.mean():.2f} "
-              f"packet_loss={packet_loss.mean():.2f}%"
-              + (f" | log com {len(log)} linhas" if log_decisions else ""))
+    print(f">>> Simulacao concluida: NVHO={avg_nvho:.2f} | QoE={qoe.mean():.2f} | "
+          f"packet_loss={packet_loss.mean():.2f}%"
+          + (f" | log com {len(log)} linhas" if log_decisions else ""))
 
     result = {
         "NVHO": avg_nvho,
