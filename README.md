@@ -232,20 +232,4 @@ _(Results to be added.)_
 
 1. A. Zeshan and T. Baykas, "Location Aware Vertical Handover in a VLC/WLAN
    Hybrid Network," _IEEE Access_, vol. 9, pp. 129810–129819, 2021.
-2. K. Deb and H. Jain, "An Evolutionary Many-Objective Optimization
-   Algorithm Using Reference-Point-Based Nondominated Sorting Approach,
-   Part I: Solving Problems with Box Constraints," _IEEE Transactions on
-   Evolutionary Computation_, vol. 18, no. 4, pp. 577–601, 2014. (NSGA-III)
-3. C. A. Coello Coello and M. S. Lechuga, "MOPSO: A Proposal for Multiple
-   Objective Particle Swarm Optimization," _Proceedings of the 2002
-   Congress on Evolutionary Computation (CEC'02)_, vol. 2, pp. 1051–1056, 2002. (MOPSO)
-4. H. Eskandar, A. Sadollah, A. Bahreininejad, and M. Hamdi, "Water Cycle
-   Algorithm – A Novel Metaheuristic Optimization Method for Solving
-   Constrained Engineering Optimization Problems," _Computers & Structures_,
-   vol. 110–111, pp. 151–166, 2012. (Water Cycle Algorithm)
-5. S. Hochreiter and J. Schmidhuber, "Long Short-Term Memory," _Neural
-   Computation_, vol. 9, no. 8, pp. 1735–1780, 1997. (LSTM)
-6. E. Zitzler, K. Deb, and L. Thiele, "Comparison of Multiobjective
-   Evolutionary Algorithms: Empirical Results," _Evolutionary Computation_,
-   vol. 8, no. 2, pp. 173–195, 2000. (ZDT benchmark suite used in
-   `optimization_hybrid.py`)
+
