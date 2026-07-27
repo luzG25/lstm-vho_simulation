@@ -13,7 +13,7 @@ time.
 
 ---
 
-## 1. Background
+## 1. Introduction
 
 The rapid growth of mobile devices and bandwidth-intensive applications has
 significantly increased the demand for high-speed, reliable, and seamless
@@ -55,7 +55,7 @@ handover decision simultaneously depends on conflicting indicators such as
 SINR, throughput, packet loss, BER, delay, QoE, user density, mobility, and
 blockage probability).
 
-## 2. Project Goal
+## 2. Objectives
 
 This project reframes the handover decision as a **Multi-Objective
 Optimization (MOO)** problem and integrates a **hybrid evolutionary
@@ -87,7 +87,7 @@ Reference baseline paper:
 
 ---
 
-## 4. What Was Faithfully Implemented (baseline reproduction)
+## 4. Simulation Enviroment
 
 - **Layout**: building 16m×16m×3m; rooms of 5.6m×5.6m×3m (4 VLC APs) and
   8m×8m×3m (9 VLC APs); VLC coverage radius per AP = 1.5 m (as in the
@@ -109,7 +109,7 @@ Reference baseline paper:
   handover frequency and by outage while attempting to use a blocked VLC
   link), and packet loss (% of time in outage while the active mode is VLC).
 
-## 5. What This Project Adds (extension beyond the reference paper)
+## 5. Contributions to the baseline paper
 
 - **Handover decision dataset**: `vho_sim.py` can log, at every simulation
   step and for every simulated user, the position, velocity, geometric VLC
@@ -152,11 +152,6 @@ Reference baseline paper:
 - Simulations use a reduced number of iterations/duration per point compared
   to the reference paper's setup, in order to run in seconds rather than
   hours; values already converge statistically at this scale.
-- The current hybrid optimizer implements **MOWGA, NSGA-III, MOPSO, and
-  MOWCA**. Note that this differs from the four-algorithm combination
-  described in the original project proposal, which also considered a
-  Multi-Objective Whale Optimization Algorithm (MOWOA); MOWGA is used here
-  in its place.
 - Dataset generation and the multi-objective optimization run entirely in
   Python/NumPy (via `vho_sim.py` and `hybrid_algorithm.py`), rather than in
   MATLAB.
@@ -170,14 +165,23 @@ Reference baseline paper:
 ## 7. How to Run
 
 ```bash
-# 1. Generate the labeled handover-decision dataset using the hybrid
+# 1. Create the virtual enviroment
+python3 -m venv venv
+
+# 2. Activate the virtual enviroment
+source ./venv/bin/activate
+
+# 3. Install the requirements
+pip install -r requirements.txt
+
+# 4. Generate the labeled handover-decision dataset using the hybrid
 #    multi-objective optimizer
 python3 optimize_vho.py
 
-# 2. Train the LSTM handover policy on the generated dataset
+# 5. Train the LSTM handover policy on the generated dataset
 python3 train_lstm_handover.py
 
-# 3. Run the comparative experiments (I-VHO, D-VHO, LA-VHO, LSTM-VHO)
+# 6. Run the comparative experiments (I-VHO, D-VHO, LA-VHO, LSTM-VHO)
 python3 run_experiments.py
 ```
 
