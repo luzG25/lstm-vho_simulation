@@ -1,11 +1,8 @@
-#lstm_policy.py
-
 """
-Wrapper de inferencia para o modelo LSTM-VHO treinado em
-train_lstm_handover.py. Usado por vho_sim.py para implementar o esquema
-"LSTM-VHO": a cada passo de simulacao, vho_sim.py mantem uma janela
-deslizante do estado de cada usuario e consulta esta politica para decidir
-se o usuario deve estar conectado via VLC ou via RF.
+Inference wrapper for the LSTM-VHO model trained in `train_lstm_handover.py`. 
+It is used by `vho_sim.py` to implement the "LSTM-VHO" scheme: at each simulation step, 
+`vho_sim.py` maintains a sliding window of each user's state and queries this policy to decide 
+whether the user should be connected via VLC or RF.
 """
 
 import json

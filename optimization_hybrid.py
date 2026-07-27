@@ -1,12 +1,9 @@
-#optimization_hybrid.py
-
 # ============================================================
 # COMPARAÇÃO MULTIOBJETIVO
 #
 # MOWGA vs NSGAIII vs MOPSO vs MOWCA vs HYBRID
 #
 # HYBRID COM CONTROLE DE ITERAÇÕES
-# + MEDIÇÃO DE TEMPO
 #
 # ============================================================
 

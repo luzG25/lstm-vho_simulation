@@ -1,43 +1,21 @@
-#vho_sim.py
-
-"""
-Reprodução da simulação de handover vertical location-aware (LA-VHO) em rede
-híbrida VLC/WLAN, comparada com I-VHO e D-VHO (t=0.5s, t=1s), baseada em:
-
-A. Zeshan and T. Baykas, "Location Aware Vertical Handover in a VLC/WLAN
-Hybrid Network," IEEE Access, vol. 9, pp. 129810-129819, 2021.
-
-OBS. IMPORTANTE (transparência metodológica):
-O artigo não publica código nem todos os parâmetros finos do modelo
-(pesos w_u/w_s exatos, custo de delay d_c, forma exata da probabilidade de
-bloqueio Pb(Nu) fora da eq. 15 simbólica, etc.). Esta reimplementação segue
-fielmente a ARQUITETURA descrita (Seção IV, Algoritmo 1, Tabela 1) e usa
-modelos simplificados, mas fisicamente coerentes, para as partes não
-especificadas numericamente. As tendências qualitativas reproduzidas batem
-com o artigo (I-VHO pior em handovers e melhor em perda de pacotes, D-VHO
-sensível ao dwell time, LA-VHO domina em handovers e QoE, sobretudo quando
-Nu ultrapassa o limiar), mas os valores percentuais exatos NÃO são
-reproduzidos (é matematicamente impossível sem os parâmetros ocultos).
-"""
-
 import numpy as np
 
 # ----------------------------------------------------------------------
-# Parâmetros do sistema (Tabela 1 do artigo)
+# Parametres
 # ----------------------------------------------------------------------
-R_VLC = 1.5          # raio de cobertura de cada AP VLC (m)
-V_MIN, V_MAX = 0.2, 1.0   # velocidade do usuário (m/s)
-DT = 0.25             # passo de tempo da simulação (s)
-MEAN_TURN_INTERVAL = 4.0  # tempo médio entre mudanças de direção (s) (fluid-flow)
+R_VLC = 1.5          # cover radius of each AP VLC (m)
+V_MIN, V_MAX = 0.2, 1.0   # velocity of user (m/s)
+DT = 0.25             # time step of simulation (s)
+MEAN_TURN_INTERVAL = 4.0  # average time between direction changes (s) (fluid-flow)
 
-DELAY_COST = 0.28     # custo (em unidades de QoE) por handover realizado
-QOE_VLC_OK = 5.0       # QoE quando conectado e transmitindo bem via VLC
-QOE_RF = 3.2            # QoE quando conectado via WLAN/RF
-QOE_OUTAGE = 0.5        # QoE quando "preso" tentando usar VLC bloqueado (perda)
+DELAY_COST = 0.28     # cost (in unit of QoE) for handover 
+QOE_VLC_OK = 5.0       # QoE when the device is conected e transmiting in VLC
+QOE_RF = 3.2            # QoE when connect in WLAN/RF
+QOE_OUTAGE = 0.5        # QoE when "locked"  trying to use VLC block (loss)
 
 
 def room_layout(room):
-    """Retorna (lista de posições de APs VLC, lado da sala)."""
+    """Returns (list of VLC AP positions, room side)."""
     if room == "small":       # 5.6 x 5.6 x 3 m, 4 APs
         L = 5.6
         c = [1.4, 4.2]
@@ -53,13 +31,10 @@ def room_layout(room):
 
 def blocking_probability(Nu):
     """
-    Probabilidade de bloqueio do canal óptico (sombreamento) em função do
-    número de usuários ativos Nu, eq. (15) do artigo (forma qualitativa:
-    cresce monotonicamente e satura). Calibrada para produzir o mesmo tipo
-    de degradação de BER/bloqueio relatado na Fig. 3 do artigo (crescente
-    e saturante com Nu).
+    Probability of optical channel blockage (shadowing) as a function of
+    the number of active users Nu.
     """
-    p1 = 0.035  # prob. de bloqueio instantâneo devido a 1 usuário passando
+    p1 = 0.035  # Instant blocking probability due to one user passing by
     return 1.0 - (1.0 - p1) ** Nu
 
 
@@ -67,24 +42,24 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
              dwell=None, threshold=None, velocity_range=(V_MIN, V_MAX),
              seed=None, log_decisions=False, verbose=False, lstm_policy=None):
     """
-    Simula `n_iter` usuários (iterações independentes) andando aleatoriamente
-    pela sala durante `sim_time` segundos, decidindo handovers verticais
-    segundo `scheme` in {'I-VHO','D-VHO','LA-VHO','LSTM-VHO'}.
+    Simulates `n_iter` users (independent iterations) moving randomly
+    around the room for `sim_time` seconds, making vertical handover decisions
+    according to `scheme` in {'I-VHO', 'D-VHO', 'LA-VHO', 'LSTM-VHO'}.
 
-    Para scheme='LSTM-VHO', é obrigatório passar `lstm_policy`, uma instância
-    de lstm_policy.LSTMHandoverPolicy carregando o modelo treinado em
-    train_lstm_handover.py. Enquanto o histórico de cada usuário ainda não
-    preenche a janela exigida pelo modelo (`lstm_policy.window_size` passos),
-    o esquema se comporta como I-VHO (usa link_available diretamente).
+    For scheme='LSTM-VHO', it is mandatory to provide `lstm_policy`, an instance
+    of lstm_policy.LSTMHandoverPolicy loading the model trained in
+    train_lstm_handover.py. Until a user's history fills the window required
+    by the model (`lstm_policy.window_size` steps), the scheme behaves
+    like I-VHO (using link_available directly).
 
-    Se log_decisions=True, o retorno inclui a chave "log": uma lista de
-    dicionários com uma linha por (usuário, passo de tempo), contendo a
-    posição, o estado do link e a decisão de handover tomada naquele
-    instante — útil para montar um dataset de decisões de handover.
+    If log_decisions=True, the return value includes the key "log": a list of
+    dictionaries with one entry per (user, time step), containing the
+    position, link state, and handover decision made at that moment—useful
+    for compiling a dataset of handover decisions.
 
-    Retorna dict com médias de: NVHO (handovers/iteração), QoE, packet_loss (%)
+    Returns a dict with averages of: NVHO (handovers/iteration), QoE, packet_loss (%)
     """
-    print(f"\n>>> Iniciando simulacao: scheme={scheme} | Nu={Nu} | room={room} "
+    print(f"\n>>>Starting Simulation: scheme={scheme} | Nu={Nu} | room={room} "
           f"| n_iter={n_iter} | sim_time={sim_time}s")
 
     if verbose:
@@ -101,10 +76,10 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
     aps, L = room_layout(room)
     n_steps = int(sim_time / DT)
 
-    print(f"    sala '{room}' carregada: {len(aps)} APs VLC, lado={L}m, "
-          f"{n_steps} passos de simulacao (DT={DT}s)")
+    print(f"    room '{room}' loaded: {len(aps)} APs VLC, side={L}m, "
+          f"{n_steps} steps of simulation (DT={DT}s)")
 
-    # --- estado vetorizado (um "usuário" por linha) ---
+    # --- vector  (one user for line) ---
     pos = rng.uniform(0, L, size=(n_iter, 2))
     ang = rng.uniform(0, 2 * np.pi, size=n_iter)
     vel = rng.uniform(*velocity_range, size=n_iter)
@@ -112,9 +87,9 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
 
     pb = blocking_probability(Nu)
 
-    mode_vlc = np.zeros(n_iter, dtype=bool)   # True = conectado via VLC
-    blocked_timer = np.zeros(n_iter)          # p/ D-VHO (dwell)
-    la_pending_timer = np.zeros(n_iter)       # p/ histerese do LA-VHO
+    mode_vlc = np.zeros(n_iter, dtype=bool)   # True = connected by VLC
+    blocked_timer = np.zeros(n_iter)          # for D-VHO (dwell)
+    la_pending_timer = np.zeros(n_iter)       
     handovers = np.zeros(n_iter)
     time_vlc_ok = np.zeros(n_iter)
     time_rf = np.zeros(n_iter)
@@ -125,8 +100,7 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
 
     log = [] if log_decisions else None
 
-    # buffer deslizante para o esquema LSTM-VHO: (n_iter, window_size, n_features)
-    # ordem das features tem que bater com lstm_policy.feature_cols:
+    # slider buffer for LSTM-VHO: (n_iter, window_size, n_features)
     # ["x","y","vel","link_available","geo_cov","shadow_blocked","mode_before"]
     if scheme == "LSTM-VHO":
         lstm_window = lstm_policy.window_size
@@ -138,14 +112,14 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
 
     for step in range(n_steps):
         t_elapsed += DT
-        # -- mudanças de direção (fluid-flow model, Seção V) --
+        # -- direction changes (fluid-flow model) --
         turn_now = t_elapsed >= next_turn
         if turn_now.any():
             ang[turn_now] = rng.uniform(0, 2 * np.pi, size=turn_now.sum())
             next_turn[turn_now] = t_elapsed[turn_now] + rng.exponential(
                 MEAN_TURN_INTERVAL, size=turn_now.sum())
 
-        # -- movimento e reflexão nas paredes --
+        # -- movement and reflexing on the walls --
         pos[:, 0] += vel * np.cos(ang) * DT
         pos[:, 1] += vel * np.sin(ang) * DT
         for k in (0, 1):
@@ -155,15 +129,15 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
             pos[above, k] = 2 * L - pos[above, k]
             ang[below | above] = rng.uniform(0, 2 * np.pi, size=(below | above).sum())
 
-        # -- cobertura geométrica VLC (dentro do raio de algum AP) --
+        # -- geometric cover VLC (between the AP cover) --
         d = np.linalg.norm(pos[:, None, :] - aps[None, :, :], axis=2)
         geo_cov = (d <= R_VLC).any(axis=1)
 
-        # -- bloqueio por sombreamento (shadowing), eq. (10)-(15) --
+        # -- shadowing --
         shadow_blocked = rng.random(n_iter) < pb
         link_available = geo_cov & (~shadow_blocked)
 
-        # ------------------- decisão de handover -------------------
+        # ------------------- handover decision -------------------
         if scheme == "I-VHO":
             new_mode = link_available
 
@@ -177,10 +151,10 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
             if force_rf:
                 new_mode = np.zeros(n_iter, dtype=bool)
             else:
-                # segunda etapa: seleção por função de custo minimizando
-                # handovers -> pequena histerese temporal (estabilidade)
-                # antes de comutar em qualquer direção, representando a
-                # minimização do custo de handover via gradiente descendente.
+                # second stage: selection via cost-minimization function
+                # handovers -> short time hysteresis (stability)
+                # before switching in any direction, representing the
+                # minimization of handover cost via gradient descent.
                 la_dwell = 1.5
                 stable_state = (link_available == mode_vlc)
                 la_pending_timer = np.where(stable_state, 0.0, la_pending_timer + DT)
@@ -188,7 +162,7 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
                 new_mode = np.where(do_switch, link_available, mode_vlc)
 
         elif scheme == "LSTM-VHO":
-            # monta a feature do passo atual na MESMA ordem usada no treino
+            # construct the feature for the current step in the SAME order used during training
             current_features = np.stack([
                 pos[:, 0], pos[:, 1], vel,
                 link_available.astype(np.float32),
@@ -202,11 +176,11 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
 
             if step >= lstm_window - 1:
                 if step == lstm_window - 1:
-                    print(f"    LSTM-VHO: aquecimento concluido no passo {step + 1} "
-                          f"— rede neural comeca a decidir a partir de agora")
+                    print(f" LSTM-VHO: warm-up completed at step {step + 1} "
+                          f"— neural network begins making decisions from this point on.")
                 new_mode = lstm_policy.decide(feat_buffer)
             else:
-                # aquecimento: janela ainda incompleta -> comporta-se como I-VHO
+                # warm-up: window still incomplete -> behaves like I-VHO
                 new_mode = link_available
 
         else:
@@ -215,9 +189,9 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
         switched = new_mode != mode_vlc
         handovers += switched
 
-        # -- métricas de QoE / perda de pacotes --
+        # -- metrics of QoE / packet loss --
         vlc_ok = new_mode & link_available
-        vlc_outage = new_mode & (~link_available)   # tentando VLC mas bloqueado -> perda
+        vlc_outage = new_mode & (~link_available)   # Trying VLC but blocked -> loss
         rf_on = ~new_mode
 
         time_vlc_ok += vlc_ok * DT
@@ -247,9 +221,9 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
         mode_vlc = new_mode
 
         if (step + 1) % max(1, n_steps // 5) == 0:
-            print(f"    [passo {step + 1}/{n_steps}] "
+            print(f"    [step {step + 1}/{n_steps}] "
                   f"(t={t_elapsed[0]:.1f}s de {sim_time}s) — "
-                  f"handovers medios ate agora: {handovers.mean():.2f}")
+                  f"Average handovers so far: {handovers.mean():.2f}")
 
     total_time = n_steps * DT
     avg_nvho = handovers.mean()
@@ -258,7 +232,7 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
     qoe = qoe - DELAY_COST * handovers / (total_time / 10.0)  # custo de sinalização
     qoe = np.clip(qoe, 0, 5)
 
-    print(f">>> Simulacao concluida: NVHO={avg_nvho:.2f} | QoE={qoe.mean():.2f} | "
+    print(f">>> Simulation Concluded: NVHO={avg_nvho:.2f} | QoE={qoe.mean():.2f} | "
           f"packet_loss={packet_loss.mean():.2f}%"
           + (f" | log com {len(log)} linhas" if log_decisions else ""))
 
