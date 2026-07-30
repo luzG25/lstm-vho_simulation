@@ -30,23 +30,21 @@ def run_scheme(name, Nu, room, **kw):
 
 
 # ======================================================================
-# FIGURE 5: NVHO vs number of users, for 2 rooms
+# FIGURE 5: NVHO vs number of users (9 APs)
 # ======================================================================
 Nu_range = list(range(1, 11))
-fig, axes = plt.subplots(1, 2, figsize=(12, 4.5))
-for ax, room, title in zip(axes, ["small", "big"], ["4 APs VLC (room 5.6x5.6m)", "9 APs VLC (room 8x8m)"]):
-    for sc in SCHEMES:
-        vals = [run_scheme(sc, Nu, room, seed=100 + Nu)["NVHO"] for Nu in Nu_range]
-        ax.plot(Nu_range, vals, marker=MARK[sc], color=COLORS[sc], label=sc)
-    ax.set_xlabel("Number of Users (Nu)")
-    ax.set_ylabel("N_VHO (average handovers )")
-    ax.set_title(title)
-    ax.grid(alpha=0.3)
-axes[0].legend(fontsize=8)
-fig.suptitle("Fig. 5 Average number of handovers vs Nu")
-fig.tight_layout()
-fig.savefig("output/fig5_nvho.png", dpi=150)
-plt.close(fig)
+plt.figure(figsize=(6, 4.5))
+for sc in SCHEMES:
+    vals = [run_scheme(sc, Nu, "big", seed=100 + Nu)["NVHO"] for Nu in Nu_range]
+    plt.plot(Nu_range, vals, marker=MARK[sc], color=COLORS[sc], label=sc)
+plt.xlabel("Number of Users (Nu)")
+plt.ylabel("Average Number of Handovers")
+plt.title("NVHO vs Number of Users (9 VLC APs)")
+plt.grid(alpha=0.3)
+plt.legend(fontsize=8)
+plt.tight_layout()
+plt.savefig("output/fig5_nvho_9aps.png", dpi=150)
+plt.close()
 
 # ======================================================================
 # FIGURE 6: QoE vs velocity (Nu fixed) and QoE vs Nu (random velocity)
@@ -78,6 +76,25 @@ fig.tight_layout()
 fig.savefig("output/fig6_qoe.png", dpi=150)
 plt.close(fig)
 
+
+#======================================================================
+# FIGURE: QoE vs Number of Users (9 APs)
+# ======================================================================
+plt.figure(figsize=(6, 4.5))
+
+for sc in SCHEMES:
+    vals = [run_scheme(sc, Nu, "big", seed=100 + Nu)["QoE"] for Nu in Nu_range]
+    plt.plot(Nu_range, vals, marker=MARK[sc], color=COLORS[sc], label=sc)
+
+plt.xlabel("Number of Users (Nu)")
+plt.ylabel("QoE")
+plt.title("QoE vs Number of Users (9 VLC APs)")
+plt.grid(alpha=0.3)
+plt.legend(fontsize=8)
+plt.tight_layout()
+plt.savefig("output/fig6_qoe_9aps.png", dpi=150)
+plt.close()
+
 # ======================================================================
 # FIGURE 7: Packet Loss vs velocity  vs Nu
 # ======================================================================
@@ -106,6 +123,24 @@ fig.suptitle("Fig. 7  — Packet loss comparation")
 fig.tight_layout()
 fig.savefig("output/fig7_packetloss.png", dpi=150)
 plt.close(fig)
+
+# ======================================================================
+# FIGURE: Packet Loss vs Number of Users (9 APs)
+# ======================================================================
+plt.figure(figsize=(6, 4.5))
+
+for sc in SCHEMES:
+    vals = [run_scheme(sc, Nu, "big", seed=100 + Nu)["packet_loss"] for Nu in Nu_range]
+    plt.plot(Nu_range, vals, marker=MARK[sc], color=COLORS[sc], label=sc)
+
+plt.xlabel("Number of Users (Nu)")
+plt.ylabel("Packet Loss (%)")
+plt.title("Packet Loss vs Number of Users (9 VLC APs)")
+plt.grid(alpha=0.3)
+plt.legend(fontsize=8)
+plt.tight_layout()
+plt.savefig("output/fig7_packetloss_9aps.png", dpi=150)
+plt.close()
 
 # ======================================================================
 # Resume table (Nu=2 e Nu=10) 

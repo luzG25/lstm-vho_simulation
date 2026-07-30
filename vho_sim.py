@@ -161,6 +161,42 @@ def simulate(scheme, Nu, room, n_iter=250, sim_time=400.0,
                 do_switch = (~stable_state) & (la_pending_timer >= la_dwell)
                 new_mode = np.where(do_switch, link_available, mode_vlc)
 
+        elif scheme == "LA-VHO2":
+            # threshold passa a representar o custo do handover
+            ho_cost = threshold / 10.0
+
+            # custo esperado em VLC
+            cost_vlc = np.where(
+                link_available,
+                0.0,          # ligação boa
+                1.0           # ligação bloqueada
+            )
+
+            # custo esperado em RF
+            cost_rf = np.full(n_iter, 0.3)
+
+            # penalizar mudanças desnecessárias
+            cost_vlc += (~mode_vlc) * ho_cost
+            cost_rf  += (mode_vlc) * ho_cost
+
+            prefer_vlc = cost_vlc < cost_rf
+
+            # histerese
+            stable_state = (prefer_vlc == mode_vlc)
+            la_pending_timer = np.where(
+                stable_state,
+                0.0,
+                la_pending_timer + DT
+            )
+
+            do_switch = (~stable_state) & (la_pending_timer >= dwell)
+
+            new_mode = np.where(
+                do_switch,
+                prefer_vlc,
+                mode_vlc
+            )
+
         elif scheme == "LSTM-VHO":
             # construct the feature for the current step in the SAME order used during training
             current_features = np.stack([
