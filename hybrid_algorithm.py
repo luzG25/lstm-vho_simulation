@@ -1,3 +1,5 @@
+# hybrid_algorithm.py
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -49,7 +51,7 @@ def pareto_front(fitness):
 
 class BaseMO:
 
-    def __init__(self, func, dim=DIM, lb=LB, ub=UB, pop_size=POP_SIZE, n_obj=2):
+    def __init__(self, func, dim=DIM, lb=LB, ub=UB, pop_size=POP_SIZE, n_obj=3):
 
         self.func = func
 
@@ -276,17 +278,15 @@ class HybridMO:
     def __init__(
         self,
         func,
-
         dim=DIM,
         lb=LB,
         ub=UB,
         pop_size=POP_SIZE,
-
+        n_obj=3,
         mowga_iters=1,
         nsgaiii_iters=2,
         mopso_iters=3,
         mowca_iters=1,
-
         exchange_interval=10
     ):
 
@@ -295,13 +295,13 @@ class HybridMO:
         self.ub = ub
         self.pop_size = pop_size
 
-        self.mowga = MOWGA(func, dim, lb, ub, pop_size)
+        self.mowga = MOWGA(func, dim, lb, ub, pop_size, n_obj)
 
-        self.nsgaiii = NSGAIII(func, dim, lb, ub, pop_size)
+        self.nsgaiii = NSGAIII(func, dim, lb, ub, pop_size,n_obj)
 
-        self.mopso = MOPSO(func, dim, lb, ub, pop_size)
+        self.mopso = MOPSO(func, dim, lb, ub, pop_size, n_obj)
 
-        self.mowca = MOWCA(func, dim, lb, ub, pop_size)
+        self.mowca = MOWCA(func, dim, lb, ub, pop_size, n_obj)
 
         self.mowga_iters = mowga_iters
         self.nsgaiii_iters = nsgaiii_iters

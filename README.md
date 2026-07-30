@@ -176,13 +176,13 @@ pip install -r requirements.txt
 
 # 4. Generate the labeled handover-decision dataset using the hybrid
 #    multi-objective optimizer
-python3 optimize_vho.py
+python optimize_vho.py
 
 # 5. Train the LSTM handover policy on the generated dataset
-python3 train_lstm_handover.py
+python train_lstm_handover.py
 
 # 6. Run the comparative experiments (I-VHO, D-VHO, LA-VHO, LSTM-VHO)
-python3 run_experiments.py
+python run_experiments.py
 ```
 
 This produces, under `output/`:
